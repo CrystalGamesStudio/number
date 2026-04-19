@@ -61,3 +61,47 @@ export function getUser(): { id: number; email: string } | null {
 export function getAccessToken(): string | null {
   return localStorage.getItem('access_token')
 }
+
+export interface User {
+  id: number
+  email: string
+  online: boolean
+}
+
+export async function getUsers(): Promise<User[]> {
+  const token = getAccessToken()
+  if (!token) throw new Error('Not authenticated')
+
+  const response = await fetch(`${API_BASE_URL}/users`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch users')
+  }
+
+  return response.json()
+}
+
+export interface Message {
+  id: number
+  sender_id: number
+  receiver_id: number
+  content: string
+  created_at: string
+}
+
+export async function getMessages(userId: number): Promise<Message[]> {
+  const token = getAccessToken()
+  if (!token) throw new Error('Not authenticated')
+
+  const response = await fetch(`${API_BASE_URL}/messages/${userId}`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch messages')
+  }
+
+  return response.json()
+}

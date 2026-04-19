@@ -2,12 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.auth import router as auth_router
 from app.websocket import router as websocket_router
+from app.users import router as users_router
+from app.messages import router as messages_router
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:5175"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -15,6 +17,8 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(websocket_router)
+app.include_router(users_router)
+app.include_router(messages_router)
 
 
 @app.get("/")

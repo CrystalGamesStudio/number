@@ -24,7 +24,7 @@ export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
         onChange={(e) => setContent(e.target.value)}
         disabled={disabled}
         placeholder="Type a message..."
-        className="flex-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="flex-1 px-3 py-2 border rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
       />
       <button
         type="submit"
