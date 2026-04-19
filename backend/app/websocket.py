@@ -58,6 +58,9 @@ async def websocket_endpoint(
     websocket: WebSocket,
     token: str = Query(..., description="JWT auth token")
 ):
+    # Debug logging
+    print(f"WebSocket connection attempt from origin: {websocket.headers.get('origin')}")
+
     user_id = decode_jwt(token)
     if not user_id:
         await websocket.close(code=1008, reason="Invalid or missing token")
@@ -81,13 +84,18 @@ async def websocket_endpoint(
                 # Save to database
                 msg_id = save_message(conn, user_id, receiver_id, content)
 
-                # Send to recipient if online
-                await manager.send_to_user(receiver_id, {
+                msg_payload = {
                     "type": "message",
                     "id": msg_id,
                     "from": user_id,
                     "content": content
-                })
+                }
+
+                # Send to recipient if online
+                await manager.send_to_user(receiver_id, msg_payload)
+
+                # Send confirmation back to sender
+                await websocket.send_json(msg_payload)
             else:
                 # Echo for unknown message types (for ping test)
                 await websocket.send_json({"type": "echo", "data": data})

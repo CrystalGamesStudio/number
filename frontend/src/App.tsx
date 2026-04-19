@@ -1,11 +1,10 @@
-import { Routes, Route, Link, useLocation } from 'react-router-dom'
+import { Routes, Route, Link, useLocation, Navigate } from 'react-router-dom'
 import { LoginForm } from './components/LoginForm'
 import { RegisterForm } from './components/RegisterForm'
+import { Chat } from './components/Chat'
+import { getUser } from './lib/api'
 
-export function App() {
-  const location = useLocation()
-  const isLogin = location.pathname === '/login' || location.pathname === '/'
-
+function AuthLayout({ children, isLogin }: { children: React.ReactNode; isLogin: boolean }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-md">
@@ -20,12 +19,36 @@ export function App() {
             </Link>
           )}
         </div>
-        <Routes>
-          <Route path="/" element={<LoginForm />} />
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/register" element={<RegisterForm />} />
-        </Routes>
+        {children}
       </div>
     </div>
+  )
+}
+
+export function App() {
+  const location = useLocation()
+  const user = getUser()
+
+  // Jeśli użytkownik jest zalogowany i próbuje wejść na login/register - przekieruj do chat
+  if (user && (location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/')) {
+    return <Navigate to="/chat" replace />
+  }
+
+  // Jeśli użytkownik nie jest zalogowany i próbuje wejść na chat - przekieruj do login
+  if (!user && location.pathname === '/chat') {
+    return <Navigate to="/login" replace />
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={
+        <AuthLayout isLogin={true}><LoginForm /></AuthLayout>
+      } />
+      <Route path="/register" element={
+        <AuthLayout isLogin={false}><RegisterForm /></AuthLayout>
+      } />
+      <Route path="/chat" element={<Chat />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
+    </Routes>
   )
 }
