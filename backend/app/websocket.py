@@ -69,7 +69,6 @@ def decode_jwt(token: str) -> int | None:
 
 
 def save_message(conn: Connection, sender_id: int, receiver_id: int, content: str) -> int:
-    """Save message to database and return message ID"""
     with conn.cursor() as cur:
         cur.execute(
             "INSERT INTO messages (sender_id, receiver_id, content, created_at) VALUES (%s, %s, %s, %s) RETURNING id",
@@ -102,21 +101,29 @@ async def websocket_endpoint(
 
             if data.get("type") == "message":
                 receiver_id = data.get("to")
-                content = data.get("content")
+                content = data.get("content", "")
 
-                if not receiver_id or not content:
-                    await websocket.send_json({"type": "error", "message": "Missing 'to' or 'content'"})
+                if not receiver_id:
+                    await websocket.send_json({"type": "error", "message": "Missing 'to'"})
                     continue
 
-                # Save to database
+                if not content and not data.get("file_url"):
+                    await websocket.send_json({"type": "error", "message": "Missing 'content' or file"})
+                    continue
+
                 msg_id = save_message(conn, user_id, receiver_id, content)
 
                 msg_payload = {
                     "type": "message",
                     "id": msg_id,
                     "from": user_id,
-                    "content": content
+                    "content": content,
                 }
+
+                if data.get("file_url"):
+                    msg_payload["file_url"] = data["file_url"]
+                    msg_payload["file_type"] = data.get("file_type", "")
+                    msg_payload["file_name"] = data.get("file_name", "")
 
                 # Send to recipient if online
                 await manager.send_to_user(receiver_id, msg_payload)

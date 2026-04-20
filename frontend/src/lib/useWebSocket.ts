@@ -8,6 +8,9 @@ export interface WebSocketMessage {
   id: number
   from: number
   content: string
+  file_url?: string
+  file_type?: string
+  file_name?: string
 }
 
 export function useWebSocket(token: string | null) {
@@ -95,12 +98,14 @@ export function useWebSocket(token: string | null) {
     }
   }, [token, startHeartbeat])
 
-  const sendMessage = useCallback((to: number, content: string) => {
-    wsRef.current?.send(JSON.stringify({
-      type: 'message',
-      to,
-      content
-    }))
+  const sendMessage = useCallback((to: number, content: string, file?: { file_url: string; file_type: string; file_name: string }) => {
+    const msg: Record<string, unknown> = { type: 'message', to, content }
+    if (file) {
+      msg.file_url = file.file_url
+      msg.file_type = file.file_type
+      msg.file_name = file.file_name
+    }
+    wsRef.current?.send(JSON.stringify(msg))
   }, [])
 
   const sendTyping = useCallback((to: number, isTyping: boolean) => {

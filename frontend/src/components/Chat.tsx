@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useWebSocket } from '../lib/useWebSocket'
-import { getAccessToken, getUser, clearTokens, getUsers, getMessages, type User, type Message } from '../lib/api'
+import { getAccessToken, getUser, clearTokens, getUsers, getMessages, uploadFile, type User, type Message } from '../lib/api'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { TypingIndicator } from './TypingIndicator'
@@ -16,6 +16,7 @@ export function Chat() {
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   const { sendMessage, sendTyping, messages: wsMessages, isConnected, typingFrom, onlineUsers } = useWebSocket(token || '')
 
@@ -82,6 +83,22 @@ export function Chat() {
     }
   }
 
+  const handleFileUpload = async (file: File) => {
+    if (!selectedUserId) return
+    setUploadError(null)
+
+    try {
+      const result = await uploadFile(file)
+      sendMessage(selectedUserId, '', {
+        file_url: result.url,
+        file_type: result.content_type,
+        file_name: result.original_filename,
+      })
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed')
+    }
+  }
+
   const handleLogout = () => {
     clearTokens()
     navigate('/login')
@@ -93,6 +110,9 @@ export function Chat() {
       from: m.sender_id,
       content: m.content,
       type: 'message' as const,
+      file_url: m.file_url,
+      file_type: m.file_type,
+      file_name: m.file_name,
     })),
     ...wsMessages.filter(
       ws => !messages.some(m => m.id === ws.id)
@@ -146,10 +166,17 @@ export function Chat() {
           <MessageList messages={displayMessages} currentUserId={user.id} />
         )}
 
+        {uploadError && (
+          <div className="px-4 py-2 bg-red-100 text-red-700 text-sm flex justify-between items-center">
+            <span>{uploadError}</span>
+            <button onClick={() => setUploadError(null)} className="text-red-900 font-bold">&times;</button>
+          </div>
+        )}
+
         {selectedUserId && (
           <TypingIndicator typingUserEmail={typingUserEmail && selectedUserId === typingFrom ? typingUserEmail : null} />
         )}
-        <MessageInput onSend={handleSend} disabled={!selectedUserId} onInputChange={handleInputChange} />
+        <MessageInput onSend={handleSend} onFileUpload={handleFileUpload} disabled={!selectedUserId} onInputChange={handleInputChange} />
       </div>
     </div>
   )

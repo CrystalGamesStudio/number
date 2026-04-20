@@ -1,10 +1,8 @@
 import os
 import uuid
-from io import BytesIO
+from pathlib import Path
 from typing import Annotated
 
-import boto3
-from botocore.config import Config as BotoConfig
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -28,15 +26,30 @@ R2_BUCKET = os.environ.get("R2_BUCKET", "")
 R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY", "")
 R2_SECRET_KEY = os.environ.get("R2_SECRET_KEY", "")
 
+USE_R2 = bool(R2_ENDPOINT and R2_BUCKET and R2_ACCESS_KEY and R2_SECRET_KEY)
+UPLOAD_DIR = Path("uploads")
 
-def get_s3_client():
-    return boto3.client(
+
+def _upload_to_r2(content: bytes, stored_name: str, content_type: str) -> str:
+    import boto3
+    from botocore.config import Config as BotoConfig
+    from io import BytesIO
+
+    s3 = boto3.client(
         "s3",
         endpoint_url=R2_ENDPOINT,
         aws_access_key_id=R2_ACCESS_KEY,
         aws_secret_access_key=R2_SECRET_KEY,
         config=BotoConfig(signature_version="s3v4"),
     )
+    s3.upload_fileobj(BytesIO(content), R2_BUCKET, stored_name, ExtraArgs={"ContentType": content_type})
+    return f"{R2_ENDPOINT}/{R2_BUCKET}/{stored_name}"
+
+
+def _upload_to_local(content: bytes, stored_name: str) -> str:
+    UPLOAD_DIR.mkdir(exist_ok=True)
+    (UPLOAD_DIR / stored_name).write_bytes(content)
+    return f"/files/serve/{stored_name}"
 
 
 @router.post("/upload")
@@ -60,10 +73,13 @@ async def upload_file(
     ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "bin"
     stored_name = f"{uuid.uuid4()}.{ext}"
 
-    s3 = get_s3_client()
-    s3.upload_fileobj(BytesIO(content), R2_BUCKET, stored_name, ExtraArgs={"ContentType": file.content_type})
-
-    url = f"{R2_ENDPOINT}/{R2_BUCKET}/{stored_name}"
+    try:
+        if USE_R2:
+            url = _upload_to_r2(content, stored_name, file.content_type)
+        else:
+            url = _upload_to_local(content, stored_name)
+    except Exception:
+        raise HTTPException(status_code=503, detail="File storage unavailable.")
 
     conn = get_db_connection()
     try:
@@ -88,6 +104,16 @@ async def upload_file(
     }
 
 
+@router.get("/serve/{stored_name}")
+async def serve_file(stored_name: str):
+    from fastapi.responses import FileResponse
+
+    path = UPLOAD_DIR / stored_name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path)
+
+
 @router.get("/{file_id}/url")
 def get_presigned_url(
     file_id: int,
@@ -102,7 +128,7 @@ def get_presigned_url(
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT filename FROM files WHERE id = %s", (file_id,))
+            cur.execute("SELECT url FROM files WHERE id = %s", (file_id,))
             row = cur.fetchone()
     finally:
         conn.close()
@@ -110,10 +136,4 @@ def get_presigned_url(
     if not row:
         raise HTTPException(status_code=404, detail="File not found")
 
-    s3 = get_s3_client()
-    url = s3.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": R2_BUCKET, "Key": row[0]},
-        ExpiresIn=3600,
-    )
-    return {"url": url}
+    return {"url": row[0]}
