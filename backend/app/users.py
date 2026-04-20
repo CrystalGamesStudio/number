@@ -1,3 +1,4 @@
+from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -6,7 +7,8 @@ from psycopg import Connection
 
 from app.auth import decode_token
 from app.database import get_db_connection
-from app.websocket import manager
+
+ONLINE_THRESHOLD = timedelta(minutes=1)
 
 router = APIRouter(prefix="/users", tags=["users"])
 security = HTTPBearer()
@@ -25,20 +27,24 @@ def get_users(
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Get all users except current
             cur.execute(
                 "SELECT id, email FROM users WHERE id != %s ORDER BY email",
                 (int(user_id),)
             )
             results = cur.fetchall()
 
-        # Build response with online status from WebSocket manager
+            cur.execute(
+                "SELECT id FROM users WHERE last_seen > %s",
+                (datetime.now(timezone.utc) - ONLINE_THRESHOLD,)
+            )
+            online_ids = {row[0] for row in cur.fetchall()}
+
         users = []
-        for user_id, email in results:
+        for uid, email in results:
             users.append({
-                "id": user_id,
+                "id": uid,
                 "email": email,
-                "online": user_id in manager.active_connections
+                "online": uid in online_ids
             })
 
         return users

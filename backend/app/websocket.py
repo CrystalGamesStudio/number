@@ -18,13 +18,40 @@ class ConnectionManager:
     async def connect(self, user_id: int, websocket: WebSocket):
         await websocket.accept()
         self.active_connections[user_id] = websocket
+        self._update_last_seen(user_id)
+        await self._broadcast_presence(user_id, online=True)
 
     def disconnect(self, user_id: int):
         self.active_connections.pop(user_id, None)
+        # Schedule broadcast — caller must await
+        self._pending_disconnect = user_id
+
+    async def finish_disconnect(self, user_id: int):
+        self._update_last_seen(user_id)
+        if user_id not in self.active_connections:
+            await self._broadcast_presence(user_id, online=False)
 
     async def send_to_user(self, user_id: int, message: dict):
         if user_id in self.active_connections:
             await self.active_connections[user_id].send_json(message)
+
+    def _update_last_seen(self, user_id: int):
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE users SET last_seen = %s WHERE id = %s",
+                    (datetime.now(timezone.utc), user_id)
+                )
+                conn.commit()
+        finally:
+            conn.close()
+
+    async def _broadcast_presence(self, user_id: int, online: bool):
+        msg = {"type": "presence", "user_id": user_id, "online": online}
+        for uid, ws in list(self.active_connections.items()):
+            if uid != user_id:
+                await ws.send_json(msg)
 
 
 manager = ConnectionManager()
@@ -109,14 +136,19 @@ async def websocket_endpoint(
                     "from": user_id,
                     "is_typing": is_typing,
                 })
+            elif data.get("type") == "heartbeat":
+                manager._update_last_seen(user_id)
+                await websocket.send_json({"type": "heartbeat_ack"})
             else:
                 # Echo for unknown message types (for ping test)
                 await websocket.send_json({"type": "echo", "data": data})
 
     except StarletteWebSocketDisconnect:
         manager.disconnect(user_id)
+        await manager.finish_disconnect(user_id)
     except Exception:
         manager.disconnect(user_id)
+        await manager.finish_disconnect(user_id)
         raise
     finally:
         conn.close()

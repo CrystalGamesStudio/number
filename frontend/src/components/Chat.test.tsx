@@ -8,8 +8,11 @@ vi.mock('../lib/api')
 vi.mock('../lib/useWebSocket', () => ({
   useWebSocket: () => ({
     sendMessage: vi.fn(),
+    sendTyping: vi.fn(),
     messages: [],
     isConnected: true,
+    typingFrom: null,
+    onlineUsers: new Map(),
   }),
 }))
 

@@ -1,4 +1,5 @@
 import pytest
+import threading
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 from app.main import app
@@ -7,6 +8,91 @@ from app.auth import SECRET_KEY, ALGORITHM
 from app.database import get_db_connection
 
 client = TestClient(app)
+
+
+def _receive(ws, timeout=3):
+    """Receive a WebSocket message with timeout"""
+    result = [None]
+    def _recv():
+        try:
+            result[0] = ws.receive_json()
+        except Exception:
+            pass
+    t = threading.Thread(target=_recv)
+    t.start()
+    t.join(timeout=timeout)
+    return result[0]
+
+
+def test_presence_event_broadcast_on_connect():
+    """All connected users receive presence event when a new user connects"""
+    token1 = jwt.encode({"sub": "1", "email": "user1@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+    token2 = jwt.encode({"sub": "2", "email": "user2@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+
+    with client.websocket_connect(f"/ws?token={token1}") as ws1:
+        with client.websocket_connect(f"/ws?token={token2}"):
+            presence = _receive(ws1)
+            assert presence is not None, "Should receive presence event on connect"
+            assert presence["type"] == "presence"
+            assert presence["user_id"] == 2
+            assert presence["online"] is True
+
+
+def test_presence_event_broadcast_on_disconnect():
+    """Connected users receive presence offline event when a user disconnects"""
+    token1 = jwt.encode({"sub": "1", "email": "user1@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+    token2 = jwt.encode({"sub": "2", "email": "user2@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+
+    with client.websocket_connect(f"/ws?token={token1}") as ws1:
+        with client.websocket_connect(f"/ws?token={token2}"):
+            # Drain connect presence
+            _receive(ws1, timeout=1)
+
+        # After ws2 disconnects, ws1 should receive offline presence
+        presence = _receive(ws1)
+        assert presence is not None, "Should receive presence event on disconnect"
+        assert presence["type"] == "presence"
+        assert presence["user_id"] == 2
+        assert presence["online"] is False
+
+
+def test_heartbeat_updates_last_seen():
+    """Heartbeat message updates user's last_seen timestamp"""
+    from datetime import datetime, timezone, timedelta
+
+    conn = get_db_connection()
+    try:
+        # Ensure user exists
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM users WHERE id = 1")
+            if not cur.fetchone():
+                cur.execute(
+                    "INSERT INTO users (id, email, password_hash) VALUES (1, 'hb@test.com', 'x')")
+                conn.commit()
+
+        token = jwt.encode({"sub": "1", "email": "hb@test.com"}, SECRET_KEY, algorithm=ALGORITHM)
+
+        with client.websocket_connect(f"/ws?token={token}") as ws:
+            # Connect sets last_seen. Reset it to old value while connected.
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE users SET last_seen = %s WHERE id = 1",
+                    (datetime.now(timezone.utc) - timedelta(hours=1),)
+                )
+                conn.commit()
+
+            old_seen = datetime.now(timezone.utc) - timedelta(hours=1)
+
+            ws.send_json({"type": "heartbeat"})
+            _receive(ws, timeout=2)
+
+            # Check last_seen was updated by heartbeat, before disconnect
+            with conn.cursor() as cur:
+                cur.execute("SELECT last_seen FROM users WHERE id = 1")
+                last_seen = cur.fetchone()[0]
+                assert last_seen > old_seen, "Heartbeat should update last_seen"
+    finally:
+        conn.close()
 
 
 def test_websocket_rejects_invalid_token():
@@ -80,17 +166,15 @@ def test_message_saves_to_database():
         token = jwt.encode({"sub": "1", "email": "user1@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
 
         with client.websocket_connect(f"/ws?token={token}") as ws:
-            # Send message (user 2 doesn't need to be connected for DB save)
             ws.send_json({"type": "message", "to": 2, "content": "Hello user2!"})
 
-        # Verify message is in database
         with conn.cursor() as cur:
             cur.execute("SELECT sender_id, receiver_id, content FROM messages")
             result = cur.fetchone()
             assert result is not None
-            assert result[0] == 1  # sender_id
-            assert result[1] == 2  # receiver_id
-            assert result[2] == "Hello user2!"  # content
+            assert result[0] == 1
+            assert result[1] == 2
+            assert result[2] == "Hello user2!"
     finally:
         conn.close()
 
@@ -100,13 +184,12 @@ def test_message_delivered_to_online_recipient():
     token1 = jwt.encode({"sub": "1", "email": "user1@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
     token2 = jwt.encode({"sub": "2", "email": "user2@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
 
-    # Connect user2 first
     with client.websocket_connect(f"/ws?token={token2}") as ws2:
-        # Then connect user1 and send message
         with client.websocket_connect(f"/ws?token={token1}") as ws1:
+            # Drain presence event from user1's connect
+            _receive(ws2, timeout=1)
             ws1.send_json({"type": "message", "to": 2, "content": "Hello user2!"})
 
-        # User2 should receive the message
         received = ws2.receive_json()
         assert received["type"] == "message"
         assert received["from"] == 1
@@ -120,6 +203,8 @@ def test_typing_indicator_relayed_to_recipient():
 
     with client.websocket_connect(f"/ws?token={token2}") as ws2:
         with client.websocket_connect(f"/ws?token={token1}") as ws1:
+            # Drain presence event
+            _receive(ws2, timeout=1)
             ws1.send_json({"type": "typing", "to": 2, "is_typing": True})
 
         received = ws2.receive_json()
@@ -136,16 +221,23 @@ def test_typing_indicator_not_relayed_to_wrong_user():
 
     with client.websocket_connect(f"/ws?token={token3}") as ws3:
         with client.websocket_connect(f"/ws?token={token2}") as ws2:
+            # Drain: ws3 gets presence for user2 connect, ws2 gets nothing (no one else)
+            _receive(ws3, timeout=1)
             with client.websocket_connect(f"/ws?token={token1}") as ws1:
-                # User1 sends typing to user2
+                # Drain: ws2 gets presence for user1, ws3 gets presence for user1
+                _receive(ws2, timeout=1)
+                _receive(ws3, timeout=1)
+
                 ws1.send_json({"type": "typing", "to": 2, "is_typing": True})
 
-                # User2 should receive it
                 received = ws2.receive_json()
                 assert received["type"] == "typing"
                 assert received["from"] == 1
 
-        # User3 should NOT receive anything (ws3 disconnects with no extra messages)
+        # User3 should NOT receive the typing event
+        msg = _receive(ws3, timeout=1)
+        assert msg is None or msg.get("type") == "presence", \
+            "User3 should not receive typing event"
 
 
 def test_typing_stop_indicator():
@@ -155,6 +247,8 @@ def test_typing_stop_indicator():
 
     with client.websocket_connect(f"/ws?token={token2}") as ws2:
         with client.websocket_connect(f"/ws?token={token1}") as ws1:
+            # Drain presence event
+            _receive(ws2, timeout=1)
             ws1.send_json({"type": "typing", "to": 2, "is_typing": False})
 
         received = ws2.receive_json()

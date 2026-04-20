@@ -17,7 +17,7 @@ export function Chat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
 
-  const { sendMessage, sendTyping, messages: wsMessages, isConnected, typingFrom } = useWebSocket(token || '')
+  const { sendMessage, sendTyping, messages: wsMessages, isConnected, typingFrom, onlineUsers } = useWebSocket(token || '')
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -31,6 +31,14 @@ export function Chat() {
       setSelectedUserId(parseInt(saved))
     }
   }, [token])
+
+  useEffect(() => {
+    if (onlineUsers.size === 0) return
+    setUsers(prev => prev.map(u => {
+      const online = onlineUsers.get(u.id)
+      return online !== undefined ? { ...u, online } : u
+    }))
+  }, [onlineUsers])
 
   useEffect(() => {
     if (selectedUserId) {

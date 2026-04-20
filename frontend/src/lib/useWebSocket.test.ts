@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { useWebSocket } from './useWebSocket'
 
@@ -162,5 +162,89 @@ describe('useWebSocket', () => {
     await waitFor(() => {
       expect(connectCount).toBe(1)
     })
+  })
+
+  it('tracks presence updates from server', async () => {
+    global.WebSocket = class MockWebSocket {
+      url: string
+      readyState = 0
+      onopen: any = null
+      onclose: any = null
+      onmessage: any = null
+
+      constructor(url: string) {
+        this.url = url
+        setTimeout(() => {
+          this.readyState = 1
+          this.onopen?.(new MessageEvent('open'))
+          this.onmessage?.(new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'presence',
+              user_id: 42,
+              online: true
+            })
+          }))
+        }, 0)
+      }
+
+      send() {}
+      close() {}
+      addEventListener() {}
+      removeEventListener() {}
+    } as any
+
+    const { result } = renderHook(() => useWebSocket('token'))
+
+    await waitFor(() => {
+      expect(result.current.onlineUsers.get(42)).toBe(true)
+    })
+  })
+
+  it('sends heartbeat at regular interval', () => {
+    vi.useFakeTimers()
+    let sentMessages: any[] = []
+    let mockInstance: any = null
+
+    global.WebSocket = class MockWebSocket {
+      static OPEN = 1
+      static CLOSED = 3
+      static CONNECTING = 0
+      static CLOSING = 2
+
+      url: string
+      readyState = 1
+      onopen: any = null
+      onclose: any = null
+      onmessage: any = null
+
+      constructor(url: string) {
+        this.url = url
+        mockInstance = this
+      }
+
+      send(data: string) {
+        sentMessages.push(JSON.parse(data))
+      }
+
+      close() {}
+      addEventListener() {}
+      removeEventListener() {}
+    } as any
+
+    renderHook(() => useWebSocket('token'))
+
+    // Manually trigger onopen (hook sets it after construction)
+    act(() => {
+      mockInstance.onopen(new MessageEvent('open'))
+    })
+
+    sentMessages = []
+    act(() => {
+      vi.advanceTimersByTime(30_000)
+    })
+
+    expect(sentMessages.some(m => m.type === 'heartbeat')).toBe(true)
+
+    vi.useRealTimers()
   })
 })

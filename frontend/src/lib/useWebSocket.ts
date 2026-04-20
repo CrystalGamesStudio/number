@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
+const HEARTBEAT_INTERVAL = 30_000
 
 export interface WebSocketMessage {
   type: 'message'
@@ -13,14 +14,25 @@ export function useWebSocket(token: string | null) {
   const [messages, setMessages] = useState<WebSocketMessage[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [typingFrom, setTypingFrom] = useState<number | null>(null)
+  const [onlineUsers, setOnlineUsers] = useState<Map<number, boolean>>(new Map())
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<any>(null)
   const reconnectAttemptsRef = useRef(0)
   const tokenRef = useRef(token)
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     tokenRef.current = token
   }, [token])
+
+  const startHeartbeat = useCallback((ws: WebSocket) => {
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+    heartbeatRef.current = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'heartbeat' }))
+      }
+    }, HEARTBEAT_INTERVAL)
+  }, [])
 
   useEffect(() => {
     if (!token) return
@@ -32,10 +44,12 @@ export function useWebSocket(token: string | null) {
     ws.onopen = () => {
       setIsConnected(true)
       reconnectAttemptsRef.current = 0
+      startHeartbeat(ws)
     }
 
     ws.onclose = () => {
       setIsConnected(false)
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current)
       const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
       reconnectAttemptsRef.current++
 
@@ -47,6 +61,7 @@ export function useWebSocket(token: string | null) {
           newWs.onopen = () => {
             setIsConnected(true)
             reconnectAttemptsRef.current = 0
+            startHeartbeat(newWs)
           }
           newWs.onclose = ws.onclose
           newWs.onmessage = ws.onmessage
@@ -60,10 +75,17 @@ export function useWebSocket(token: string | null) {
         setMessages(prev => [...prev, msg])
       } else if (msg.type === 'typing') {
         setTypingFrom(msg.is_typing ? msg.from : null)
+      } else if (msg.type === 'presence') {
+        setOnlineUsers(prev => {
+          const next = new Map(prev)
+          next.set(msg.user_id, msg.online)
+          return next
+        })
       }
     }
 
     return () => {
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current)
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
@@ -71,7 +93,7 @@ export function useWebSocket(token: string | null) {
         wsRef.current.close()
       }
     }
-  }, [token])
+  }, [token, startHeartbeat])
 
   const sendMessage = useCallback((to: number, content: string) => {
     wsRef.current?.send(JSON.stringify({
@@ -89,5 +111,5 @@ export function useWebSocket(token: string | null) {
     }))
   }, [])
 
-  return { sendMessage, sendTyping, messages, isConnected, typingFrom }
+  return { sendMessage, sendTyping, messages, isConnected, typingFrom, onlineUsers }
 }
