@@ -4,6 +4,7 @@ from app.auth import router as auth_router
 from app.websocket import router as websocket_router
 from app.users import router as users_router
 from app.messages import router as messages_router
+from app.files import router as files_router
 
 app = FastAPI()
 
@@ -19,6 +20,7 @@ app.include_router(auth_router)
 app.include_router(websocket_router)
 app.include_router(users_router)
 app.include_router(messages_router)
+app.include_router(files_router)
 
 
 @app.get("/")

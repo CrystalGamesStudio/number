@@ -18,6 +18,7 @@ def clean_database():
         with conn.cursor() as cur:
             cur.execute("DELETE FROM sessions")
             cur.execute("DELETE FROM messages")
+            cur.execute("DELETE FROM files")
             cur.execute("DELETE FROM users")
             conn.commit()
         yield
