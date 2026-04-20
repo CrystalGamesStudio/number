@@ -12,12 +12,12 @@ export interface WebSocketMessage {
 export function useWebSocket(token: string | null) {
   const [messages, setMessages] = useState<WebSocketMessage[]>([])
   const [isConnected, setIsConnected] = useState(false)
+  const [typingFrom, setTypingFrom] = useState<number | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<any>(null)
   const reconnectAttemptsRef = useRef(0)
   const tokenRef = useRef(token)
 
-  // Update token ref when token changes
   useEffect(() => {
     tokenRef.current = token
   }, [token])
@@ -36,12 +36,10 @@ export function useWebSocket(token: string | null) {
 
     ws.onclose = () => {
       setIsConnected(false)
-      // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
       const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
       reconnectAttemptsRef.current++
 
       reconnectTimeoutRef.current = setTimeout(() => {
-        // Reconnect with current token
         const currentToken = tokenRef.current
         if (currentToken) {
           const newWs = new WebSocket(`${WS_URL}?token=${currentToken}`)
@@ -60,6 +58,8 @@ export function useWebSocket(token: string | null) {
       const msg = JSON.parse(event.data)
       if (msg.type === 'message') {
         setMessages(prev => [...prev, msg])
+      } else if (msg.type === 'typing') {
+        setTypingFrom(msg.is_typing ? msg.from : null)
       }
     }
 
@@ -71,7 +71,7 @@ export function useWebSocket(token: string | null) {
         wsRef.current.close()
       }
     }
-  }, [token]) // Only reconnect when token changes
+  }, [token])
 
   const sendMessage = useCallback((to: number, content: string) => {
     wsRef.current?.send(JSON.stringify({
@@ -81,5 +81,13 @@ export function useWebSocket(token: string | null) {
     }))
   }, [])
 
-  return { sendMessage, messages, isConnected }
+  const sendTyping = useCallback((to: number, isTyping: boolean) => {
+    wsRef.current?.send(JSON.stringify({
+      type: 'typing',
+      to,
+      is_typing: isTyping,
+    }))
+  }, [])
+
+  return { sendMessage, sendTyping, messages, isConnected, typingFrom }
 }

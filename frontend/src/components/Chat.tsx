@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useWebSocket } from '../lib/useWebSocket'
 import { getAccessToken, getUser, clearTokens, getUsers, getMessages, type User, type Message } from '../lib/api'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { TypingIndicator } from './TypingIndicator'
 import { UserList } from './UserList'
 import { useNavigate } from 'react-router-dom'
 
@@ -16,21 +17,21 @@ export function Chat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
 
-  const { sendMessage, isConnected } = useWebSocket(token || '')
+  const { sendMessage, sendTyping, messages: wsMessages, isConnected, typingFrom } = useWebSocket(token || '')
+
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (!token) return
 
     getUsers().then(setUsers).catch(console.error)
 
-    // Restore selected user from session storage
     const saved = sessionStorage.getItem('selectedUserId')
     if (saved) {
       setSelectedUserId(parseInt(saved))
     }
   }, [token])
 
-  // Persist selected user to session storage
   useEffect(() => {
     if (selectedUserId) {
       sessionStorage.setItem('selectedUserId', selectedUserId.toString())
@@ -49,9 +50,27 @@ export function Chat() {
       .finally(() => setIsLoadingMessages(false))
   }, [selectedUserId])
 
+  const handleInputChange = useCallback(() => {
+    if (!selectedUserId) return
+
+    sendTyping(selectedUserId, true)
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      sendTyping(selectedUserId, false)
+    }, 3000)
+  }, [selectedUserId, sendTyping])
+
   const handleSend = (content: string) => {
     if (selectedUserId) {
       sendMessage(selectedUserId, content)
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      sendTyping(selectedUserId, false)
     }
   }
 
@@ -60,11 +79,25 @@ export function Chat() {
     navigate('/login')
   }
 
+  const displayMessages = [
+    ...messages.map(m => ({
+      id: m.id,
+      from: m.sender_id,
+      content: m.content,
+      type: 'message' as const,
+    })),
+    ...wsMessages.filter(
+      ws => !messages.some(m => m.id === ws.id)
+    ),
+  ]
+
+  const typingUser = users.find(u => u.id === typingFrom)
+  const typingUserEmail = typingFrom ? (typingUser?.email || null) : null
+
   if (!user) return null
 
   return (
     <div className="h-screen flex bg-gray-50">
-      {/* Sidebar with users list */}
       <div className="w-64 bg-white border-r">
         <div className="p-4 border-b">
           <h2 className="font-semibold text-gray-700">Conversations</h2>
@@ -76,7 +109,6 @@ export function Chat() {
         />
       </div>
 
-      {/* Main chat area */}
       <div className="flex-1 flex flex-col">
         <div className="p-4 bg-white border-b flex justify-between items-center">
           <h1 className="text-xl font-semibold">Wiadomości</h1>
@@ -103,15 +135,13 @@ export function Chat() {
             Loading messages...
           </div>
         ) : (
-          <MessageList messages={messages.map(m => ({
-            id: m.id,
-            from: m.sender_id,
-            content: m.content,
-            type: 'message'
-          }))} currentUserId={user.id} />
+          <MessageList messages={displayMessages} currentUserId={user.id} />
         )}
 
-        <MessageInput onSend={handleSend} disabled={!selectedUserId} />
+        {selectedUserId && (
+          <TypingIndicator typingUserEmail={typingUserEmail && selectedUserId === typingFrom ? typingUserEmail : null} />
+        )}
+        <MessageInput onSend={handleSend} disabled={!selectedUserId} onInputChange={handleInputChange} />
       </div>
     </div>
   )

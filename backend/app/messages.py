@@ -2,7 +2,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from psycopg import Connection
 
 from app.auth import decode_token
 from app.database import get_db_connection
@@ -25,7 +24,6 @@ def get_messages(
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Get messages between current user and other user
             cur.execute(
                 """SELECT id, sender_id, receiver_id, content, created_at
                    FROM messages

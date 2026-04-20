@@ -96,6 +96,19 @@ async def websocket_endpoint(
 
                 # Send confirmation back to sender
                 await websocket.send_json(msg_payload)
+            elif data.get("type") == "typing":
+                receiver_id = data.get("to")
+                is_typing = data.get("is_typing", True)
+
+                if not receiver_id:
+                    await websocket.send_json({"type": "error", "message": "Missing 'to'"})
+                    continue
+
+                await manager.send_to_user(receiver_id, {
+                    "type": "typing",
+                    "from": user_id,
+                    "is_typing": is_typing,
+                })
             else:
                 # Echo for unknown message types (for ping test)
                 await websocket.send_json({"type": "echo", "data": data})

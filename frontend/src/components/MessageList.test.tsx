@@ -8,29 +8,24 @@ describe('MessageList', () => {
     const messages: WebSocketMessage[] = [
       { type: 'message', id: 1, from: 999, content: 'my message' }
     ]
-    const currentUserId = 999
 
-    render(<MessageList messages={messages} currentUserId={currentUserId} />)
+    render(<MessageList messages={messages} currentUserId={999} />)
 
-    const messageEl = screen.getByText('my message')
-    expect(messageEl).toBeInTheDocument()
+    expect(screen.getByText('my message')).toBeInTheDocument()
   })
 
   it('displays their messages on the left', () => {
     const messages: WebSocketMessage[] = [
       { type: 'message', id: 1, from: 123, content: 'their message' }
     ]
-    const currentUserId = 999
 
-    render(<MessageList messages={messages} currentUserId={currentUserId} />)
+    render(<MessageList messages={messages} currentUserId={999} />)
 
-    const messageEl = screen.getByText('their message')
-    expect(messageEl).toBeInTheDocument()
+    expect(screen.getByText('their message')).toBeInTheDocument()
   })
 
   it('shows empty state when no messages', () => {
     render(<MessageList messages={[]} currentUserId={999} />)
-
     expect(screen.getByText('No messages yet')).toBeInTheDocument()
   })
 
@@ -44,7 +39,6 @@ describe('MessageList', () => {
     ]
 
     rerender(<MessageList messages={messages} currentUserId={999} />)
-
     expect(screen.getByText('new message')).toBeInTheDocument()
   })
 })

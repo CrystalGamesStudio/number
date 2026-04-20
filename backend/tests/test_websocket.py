@@ -111,3 +111,53 @@ def test_message_delivered_to_online_recipient():
         assert received["type"] == "message"
         assert received["from"] == 1
         assert received["content"] == "Hello user2!"
+
+
+def test_typing_indicator_relayed_to_recipient():
+    """Typing indicator is relayed to the conversation partner"""
+    token1 = jwt.encode({"sub": "1", "email": "user1@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+    token2 = jwt.encode({"sub": "2", "email": "user2@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+
+    with client.websocket_connect(f"/ws?token={token2}") as ws2:
+        with client.websocket_connect(f"/ws?token={token1}") as ws1:
+            ws1.send_json({"type": "typing", "to": 2, "is_typing": True})
+
+        received = ws2.receive_json()
+        assert received["type"] == "typing"
+        assert received["from"] == 1
+        assert received["is_typing"] is True
+
+
+def test_typing_indicator_not_relayed_to_wrong_user():
+    """Typing indicator is NOT sent to users who are not the recipient"""
+    token1 = jwt.encode({"sub": "1", "email": "user1@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+    token2 = jwt.encode({"sub": "2", "email": "user2@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+    token3 = jwt.encode({"sub": "3", "email": "user3@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+
+    with client.websocket_connect(f"/ws?token={token3}") as ws3:
+        with client.websocket_connect(f"/ws?token={token2}") as ws2:
+            with client.websocket_connect(f"/ws?token={token1}") as ws1:
+                # User1 sends typing to user2
+                ws1.send_json({"type": "typing", "to": 2, "is_typing": True})
+
+                # User2 should receive it
+                received = ws2.receive_json()
+                assert received["type"] == "typing"
+                assert received["from"] == 1
+
+        # User3 should NOT receive anything (ws3 disconnects with no extra messages)
+
+
+def test_typing_stop_indicator():
+    """Typing stop (is_typing: false) is also relayed"""
+    token1 = jwt.encode({"sub": "1", "email": "user1@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+    token2 = jwt.encode({"sub": "2", "email": "user2@example.com"}, SECRET_KEY, algorithm=ALGORITHM)
+
+    with client.websocket_connect(f"/ws?token={token2}") as ws2:
+        with client.websocket_connect(f"/ws?token={token1}") as ws1:
+            ws1.send_json({"type": "typing", "to": 2, "is_typing": False})
+
+        received = ws2.receive_json()
+        assert received["type"] == "typing"
+        assert received["from"] == 1
+        assert received["is_typing"] is False

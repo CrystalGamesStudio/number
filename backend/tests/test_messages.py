@@ -1,5 +1,14 @@
 import pytest
-from httpx import AsyncClient
+import pytest_asyncio
+from httpx import AsyncClient, ASGITransport
+from app.main import app
+from app.database import get_db_connection
+
+
+@pytest_asyncio.fixture
+async def async_client():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client
 
 
 @pytest.mark.asyncio
@@ -10,7 +19,6 @@ async def test_get_messages_requires_authentication(async_client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_get_messages_returns_conversation_history(async_client: AsyncClient):
-    # Create two users
     resp1 = await async_client.post("/auth/register", json={"email": "alice@example.com", "password": "pass123"})
     resp2 = await async_client.post("/auth/register", json={"email": "bob@example.com", "password": "pass123"})
 
@@ -18,8 +26,6 @@ async def test_get_messages_returns_conversation_history(async_client: AsyncClie
     alice_id = resp1.json()["user"]["id"]
     bob_id = resp2.json()["user"]["id"]
 
-    # Alice sends messages to Bob (direct DB insert for test control)
-    # Note: In real scenario messages come through WebSocket, but for test we'll insert directly
     from app.database import get_db_connection
     conn = get_db_connection()
     try:
@@ -40,7 +46,6 @@ async def test_get_messages_returns_conversation_history(async_client: AsyncClie
     finally:
         conn.close()
 
-    # Alice gets conversation with Bob
     response = await async_client.get(
         f"/messages/{bob_id}",
         headers={"Authorization": f"Bearer {token1}"}
@@ -50,7 +55,6 @@ async def test_get_messages_returns_conversation_history(async_client: AsyncClie
     messages = response.json()
     assert len(messages) == 3
 
-    # Check message structure
     for msg in messages:
         assert "id" in msg
         assert "sender_id" in msg
@@ -58,7 +62,6 @@ async def test_get_messages_returns_conversation_history(async_client: AsyncClie
         assert "content" in msg
         assert "created_at" in msg
 
-    # Check content
     contents = [m["content"] for m in messages]
     assert "Hi Bob" in contents
     assert "Hello Alice" in contents

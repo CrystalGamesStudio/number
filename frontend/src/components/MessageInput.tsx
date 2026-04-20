@@ -3,9 +3,10 @@ import { useState, FormEvent } from 'react'
 interface MessageInputProps {
   onSend: (content: string) => void
   disabled?: boolean
+  onInputChange?: () => void
 }
 
-export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
+export function MessageInput({ onSend, disabled = false, onInputChange }: MessageInputProps) {
   const [content, setContent] = useState('')
 
   function handleSubmit(e: FormEvent) {
@@ -21,7 +22,10 @@ export function MessageInput({ onSend, disabled = false }: MessageInputProps) {
       <input
         type="text"
         value={content}
-        onChange={(e) => setContent(e.target.value)}
+        onChange={(e) => {
+          setContent(e.target.value)
+          onInputChange?.()
+        }}
         disabled={disabled}
         placeholder="Type a message..."
         className="flex-1 px-3 py-2 border rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
