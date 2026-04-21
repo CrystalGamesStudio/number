@@ -6,15 +6,15 @@ import { getUser } from './lib/api'
 
 function AuthLayout({ children, isLogin }: { children: React.ReactNode; isLogin: boolean }) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-secondary p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-4">
           {isLogin ? (
-            <Link to="/register" className="text-sm text-blue-600 hover:underline">
+            <Link to="/register" className="text-sm text-green hover:underline">
               Create Account
             </Link>
           ) : (
-            <Link to="/login" className="text-sm text-blue-600 hover:underline">
+            <Link to="/login" className="text-sm text-green hover:underline">
               Sign In
             </Link>
           )}

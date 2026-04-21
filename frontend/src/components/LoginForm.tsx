@@ -27,14 +27,14 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full max-w-md bg-primary rounded-2xl shadow-lg">
       <CardHeader>
-        <CardTitle>Sign In</CardTitle>
-        <CardDescription>Enter your credentials to access your account</CardDescription>
+        <CardTitle className="text-green">Sign In</CardTitle>
+        <CardDescription className="text-secondary">Enter your credentials to access your account</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="text-sm text-red-500">{error}</div>}
+          {error && <div className="text-sm text-red-500 p-3 rounded-xl bg-red-50 dark:bg-red-900/20">{error}</div>}
           <FormField
             id="email"
             label="Email"
@@ -52,7 +52,7 @@ export function LoginForm() {
             onChange={e => setPassword(e.target.value)}
             required
           />
-          <Button type="submit" className="w-full" disabled={isLoading}>
+          <Button type="submit" className="w-full bg-green hover:bg-green-hover text-white rounded-xl" disabled={isLoading}>
             {isLoading ? 'Signing in...' : 'Sign In'}
           </Button>
         </form>

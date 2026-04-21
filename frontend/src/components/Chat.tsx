@@ -5,6 +5,7 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { TypingIndicator } from './TypingIndicator'
 import { UserList } from './UserList'
+import { ThemeToggle } from './theme-toggle'
 import { useNavigate } from 'react-router-dom'
 
 export function Chat() {
@@ -125,10 +126,10 @@ export function Chat() {
   if (!user) return null
 
   return (
-    <div className="h-screen flex bg-gray-50">
-      <div className="w-64 bg-white border-r">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-gray-700">Conversations</h2>
+    <div className="h-screen flex bg-primary">
+      <div className="w-64 bg-secondary border-r border-theme">
+        <div className="p-4 border-b border-theme">
+          <h2 className="font-semibold text-primary">Conversations</h2>
         </div>
         <UserList
           users={users}
@@ -138,16 +139,17 @@ export function Chat() {
       </div>
 
       <div className="flex-1 flex flex-col">
-        <div className="p-4 bg-white border-b flex justify-between items-center">
-          <h1 className="text-xl font-semibold">Wiadomości</h1>
+        <div className="p-4 bg-primary border-b border-theme flex justify-between items-center">
+          <h1 className="text-xl font-semibold text-green">Wiadomości</h1>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-sm text-gray-600">{user.email}</span>
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green' : 'bg-red-500'}`} />
+              <span className="text-sm text-secondary">{user.email}</span>
             </div>
+            <ThemeToggle />
             <button
               onClick={handleLogout}
-              className="text-sm text-red-600 hover:text-red-700"
+              className="text-sm text-green hover:underline"
             >
               Wyloguj
             </button>
@@ -155,11 +157,11 @@ export function Chat() {
         </div>
 
         {selectedUserId === null ? (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="flex-1 flex items-center justify-center text-secondary">
             Select a conversation to start messaging
           </div>
         ) : isLoadingMessages ? (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="flex-1 flex items-center justify-center text-secondary">
             Loading messages...
           </div>
         ) : (

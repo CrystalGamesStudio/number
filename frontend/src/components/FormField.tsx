@@ -14,7 +14,7 @@ interface FormFieldProps {
 export function FormField({ id, label, type, value, onChange, required, placeholder }: FormFieldProps) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className="text-sm font-medium text-primary">{label}</Label>
       <Input
         id={id}
         type={type}
@@ -22,6 +22,7 @@ export function FormField({ id, label, type, value, onChange, required, placehol
         value={value}
         onChange={onChange}
         required={required}
+        className="rounded-xl"
       />
     </div>
   )

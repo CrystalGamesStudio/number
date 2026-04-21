@@ -9,7 +9,7 @@ interface UserListProps {
 export function UserList({ users, selectedUserId, onSelectUser }: UserListProps) {
   if (users.length === 0) {
     return (
-      <div className="p-4 text-center text-gray-500">
+      <div className="p-4 text-center text-secondary">
         No users available
       </div>
     )
@@ -21,13 +21,15 @@ export function UserList({ users, selectedUserId, onSelectUser }: UserListProps)
         <div
           key={user.id}
           onClick={() => onSelectUser(user.id)}
-          className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 ${
-            selectedUserId === user.id ? 'bg-blue-50' : ''
+          className={`flex items-center gap-3 p-3 cursor-pointer mx-2 my-1 rounded-xl transition-all ${
+            selectedUserId === user.id
+              ? 'bg-green-light text-green hover:opacity-80'
+              : 'hover:bg-muted'
           }`}
         >
           <div
             className={`w-3 h-3 rounded-full ${
-              user.online ? 'bg-green-500' : 'bg-gray-300'
+              user.online ? 'bg-green' : 'bg-muted'
             }`}
           />
           <span className="text-sm">{user.email}</span>

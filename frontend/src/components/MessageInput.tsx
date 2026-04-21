@@ -76,12 +76,12 @@ export function MessageInput({ onSend, onFileUpload, disabled = false, onInputCh
   }, [showPicker])
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="p-4 border-t relative">
+    <form ref={formRef} onSubmit={handleSubmit} className="p-4 border-t border-theme relative">
       {uploading && pendingFile && (
-        <div className="flex items-center gap-2 mb-2 text-sm text-gray-600">
+        <div className="flex items-center gap-2 mb-2 text-sm text-secondary">
           <div className="flex-1">
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '60%' }} />
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-green rounded-full animate-pulse" style={{ width: '60%' }} />
             </div>
             <span className="text-xs mt-1 block">{pendingFile}</span>
           </div>
@@ -112,7 +112,7 @@ export function MessageInput({ onSend, onFileUpload, disabled = false, onInputCh
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || uploading}
-          className="px-2 py-2 text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+          className="px-3 py-2 text-sm text-secondary hover:text-green disabled:text-muted rounded-xl transition-colors"
           aria-label="Attach file"
         >
           Attach
@@ -120,7 +120,7 @@ export function MessageInput({ onSend, onFileUpload, disabled = false, onInputCh
         <button
           type="button"
           onClick={() => setShowPicker(v => !v)}
-          className="px-2 py-2 text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+          className="px-3 py-2 text-sm text-secondary hover:text-green disabled:text-muted rounded-xl transition-colors"
           aria-label="Emoji picker"
         >
           Emoji
@@ -134,12 +134,12 @@ export function MessageInput({ onSend, onFileUpload, disabled = false, onInputCh
           }}
           disabled={disabled || uploading}
           placeholder="Type a message..."
-          className="flex-1 px-3 py-2 border rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none"
+          className="flex-1 px-3 py-2 border border-theme rounded-xl focus:border-green focus:ring-2 focus:ring-green/20 outline-none transition-all"
         />
         <button
           type="submit"
           disabled={disabled || !content.trim() || uploading}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-green text-white rounded-xl hover:bg-green-hover disabled:bg-muted disabled:cursor-not-allowed transition-colors"
         >
           Send
         </button>

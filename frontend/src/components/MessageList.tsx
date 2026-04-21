@@ -19,7 +19,7 @@ function Lightbox({ src, alt, onClose }: { src: string; alt: string; onClose: ()
       className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center"
       onClick={onClose}
     >
-      <img src={src} alt={alt} className="max-w-[90vw] max-h-[90vh] rounded-lg" />
+      <img src={src} alt={alt} className="max-w-[90vw] max-h-[90vh] rounded-2xl" />
     </div>
   )
 }
@@ -37,7 +37,7 @@ function FileAttachment({ msg }: { msg: WebSocketMessage }) {
         <img
           src={url}
           alt={msg.file_name || 'image'}
-          className="max-w-full rounded-lg cursor-pointer"
+          className="max-w-full rounded-xl cursor-pointer"
           onClick={() => setLightbox(true)}
         />
         {lightbox && (
@@ -52,7 +52,7 @@ function FileAttachment({ msg }: { msg: WebSocketMessage }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="underline"
+      className="underline text-green hover:opacity-80"
     >
       {msg.file_name || 'Download file'}
     </a>
@@ -70,7 +70,7 @@ export function MessageList({ messages, currentUserId }: MessageListProps) {
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
+      <div className="flex-1 flex items-center justify-center text-secondary">
         No messages yet
       </div>
     )
@@ -86,10 +86,10 @@ export function MessageList({ messages, currentUserId }: MessageListProps) {
             className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-xs px-4 py-2 rounded-lg ${
+              className={`max-w-xs px-4 py-2 rounded-xl ${
                 isMine
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200 text-gray-900'
+                  ? 'bg-green text-white'
+                  : 'bg-muted text-primary'
               }`}
             >
               {msg.file_url ? (
