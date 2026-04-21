@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:widget": "vite build --config vite.widget.config.ts",
+    "build:standalone": "vite build --config vite.standalone.config.ts",
+    "build:all": "npm run build && npm run build:widget && npm run build:standalone",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest"

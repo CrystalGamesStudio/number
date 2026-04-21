@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
+const DEFAULT_WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
 const HEARTBEAT_INTERVAL = 30_000
 
 export interface WebSocketMessage {
@@ -13,7 +13,7 @@ export interface WebSocketMessage {
   file_name?: string
 }
 
-export function useWebSocket(token: string | null) {
+export function useWebSocket(token: string | null, wsUrl?: string) {
   const [messages, setMessages] = useState<WebSocketMessage[]>([])
   const [isConnected, setIsConnected] = useState(false)
   const [typingFrom, setTypingFrom] = useState<number | null>(null)
@@ -37,10 +37,12 @@ export function useWebSocket(token: string | null) {
     }, HEARTBEAT_INTERVAL)
   }, [])
 
+  const baseUrl = wsUrl || DEFAULT_WS_URL
+
   useEffect(() => {
     if (!token) return
 
-    const url = `${WS_URL}?token=${token}`
+    const url = `${baseUrl}?token=${token}`
     const ws = new WebSocket(url)
     wsRef.current = ws
 
@@ -59,7 +61,7 @@ export function useWebSocket(token: string | null) {
       reconnectTimeoutRef.current = setTimeout(() => {
         const currentToken = tokenRef.current
         if (currentToken) {
-          const newWs = new WebSocket(`${WS_URL}?token=${currentToken}`)
+          const newWs = new WebSocket(`${baseUrl}?token=${currentToken}`)
           wsRef.current = newWs
           newWs.onopen = () => {
             setIsConnected(true)
@@ -96,7 +98,7 @@ export function useWebSocket(token: string | null) {
         wsRef.current.close()
       }
     }
-  }, [token, startHeartbeat])
+  }, [token, baseUrl, startHeartbeat])
 
   const sendMessage = useCallback((to: number, content: string, file?: { file_url: string; file_type: string; file_name: string }) => {
     const msg: Record<string, unknown> = { type: 'message', to, content }
