@@ -1,4 +1,5 @@
-import { useState, useRef, FormEvent } from 'react'
+import { useState, useRef, FormEvent, useEffect } from 'react'
+import Picker from 'emoji-picker-react'
 
 interface MessageInputProps {
   onSend: (content: string) => void
@@ -11,7 +12,9 @@ export function MessageInput({ onSend, onFileUpload, disabled = false, onInputCh
   const [content, setContent] = useState('')
   const [uploading, setUploading] = useState(false)
   const [pendingFile, setPendingFile] = useState<string | null>(null)
+  const [showPicker, setShowPicker] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -46,8 +49,34 @@ export function MessageInput({ onSend, onFileUpload, disabled = false, onInputCh
     }
   }
 
+  function handleEmojiClick(emojiData: { emoji: string }) {
+    setContent(prev => prev + emojiData.emoji)
+    onInputChange?.()
+    const recent = JSON.parse(localStorage.getItem('recent-emojis') || '[]') as string[]
+    const updated = [emojiData.emoji, ...recent.filter((e: string) => e !== emojiData.emoji)].slice(0, 10)
+    localStorage.setItem('recent-emojis', JSON.stringify(updated))
+  }
+
+  useEffect(() => {
+    if (!showPicker) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setShowPicker(false)
+    }
+    function handleClickOutside(e: MouseEvent) {
+      if (formRef.current && !formRef.current.contains(e.target as Node)) {
+        setShowPicker(false)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showPicker])
+
   return (
-    <form onSubmit={handleSubmit} className="p-4 border-t">
+    <form ref={formRef} onSubmit={handleSubmit} className="p-4 border-t relative">
       {uploading && pendingFile && (
         <div className="flex items-center gap-2 mb-2 text-sm text-gray-600">
           <div className="flex-1">
@@ -66,6 +95,11 @@ export function MessageInput({ onSend, onFileUpload, disabled = false, onInputCh
           </button>
         </div>
       )}
+      {showPicker && (
+        <div role="dialog" aria-label="Emoji picker" className="absolute bottom-full left-0 mb-2">
+          <Picker onEmojiClick={handleEmojiClick} />
+        </div>
+      )}
       <div className="flex gap-2">
         <input
           ref={fileInputRef}
@@ -81,7 +115,15 @@ export function MessageInput({ onSend, onFileUpload, disabled = false, onInputCh
           className="px-2 py-2 text-gray-500 hover:text-gray-700 disabled:text-gray-300"
           aria-label="Attach file"
         >
-          &#128206;
+          Attach
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowPicker(v => !v)}
+          className="px-2 py-2 text-gray-500 hover:text-gray-700 disabled:text-gray-300"
+          aria-label="Emoji picker"
+        >
+          Emoji
         </button>
         <input
           type="text"

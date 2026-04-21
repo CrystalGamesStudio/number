@@ -1,6 +1,20 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('emoji-picker-react', () => ({
+  default: ({ onEmojiClick }: { onEmojiClick: (emoji: { emoji: string }) => void }) => (
+    <div data-testid="emoji-picker">
+      <button onClick={() => onEmojiClick({ emoji: '😀' })}>😀</button>
+      <button onClick={() => onEmojiClick({ emoji: '❤️' })}>❤️</button>
+    </div>
+  ),
+}))
+
+beforeEach(() => {
+  localStorage.clear()
+})
+
 import { MessageInput } from './MessageInput'
 
 describe('MessageInput', () => {
@@ -63,6 +77,79 @@ describe('MessageInput', () => {
     await screen.findByRole('button', { name: /attach/i })
   })
 
+  it('renders emoji button in toolbar', () => {
+    render(<MessageInput onSend={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /emoji/i })).toBeInTheDocument()
+  })
+
+  it('opens emoji picker when emoji button is clicked', async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} />)
+
+    const emojiButton = screen.getByRole('button', { name: /emoji/i })
+    await user.click(emojiButton)
+
+    expect(screen.getByRole('dialog', { name: /emoji/i })).toBeInTheDocument()
+  })
+
+  it('closes emoji picker when emoji button is clicked again', async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} />)
+
+    const emojiButton = screen.getByRole('button', { name: /emoji/i })
+    await user.click(emojiButton)
+    expect(screen.getByRole('dialog', { name: /emoji/i })).toBeInTheDocument()
+
+    await user.click(emojiButton)
+    expect(screen.queryByRole('dialog', { name: /emoji/i })).not.toBeInTheDocument()
+  })
+
+  it('inserts selected emoji into message input', async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} />)
+
+    const input = screen.getByRole('textbox') as HTMLInputElement
+
+    const emojiButton = screen.getByRole('button', { name: /emoji/i })
+    await user.click(emojiButton)
+
+    const grinningButton = screen.getByText('😀')
+    await user.click(grinningButton)
+
+    expect(input.value).toContain('😀')
+  })
+
+  it('closes emoji picker on ESC key', async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} />)
+
+    const emojiButton = screen.getByRole('button', { name: /emoji/i })
+    await user.click(emojiButton)
+    expect(screen.getByRole('dialog', { name: /emoji/i })).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog', { name: /emoji/i })).not.toBeInTheDocument()
+  })
+
+  it('closes emoji picker when clicking outside', async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <div data-testid="outside" />
+        <MessageInput onSend={vi.fn()} />
+      </>
+    )
+
+    const emojiButton = screen.getByRole('button', { name: /emoji/i })
+    await user.click(emojiButton)
+    expect(screen.getByRole('dialog', { name: /emoji/i })).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('outside'))
+
+    expect(screen.queryByRole('dialog', { name: /emoji/i })).not.toBeInTheDocument()
+  })
+
   it('shows cancel button during upload', async () => {
     const onFileUpload = vi.fn(() => new Promise<void>(() => {}))
     render(<MessageInput onSend={vi.fn()} onFileUpload={onFileUpload} />)
@@ -73,5 +160,19 @@ describe('MessageInput', () => {
     fireEvent.change(fileInput, { target: { files: [file] } })
 
     expect(screen.getByRole('button', { name: /cancel upload/i })).toBeInTheDocument()
+  })
+
+  it('persists recently used emojis to localStorage', async () => {
+    const user = userEvent.setup()
+    render(<MessageInput onSend={vi.fn()} />)
+
+    const emojiButton = screen.getByRole('button', { name: /emoji/i })
+    await user.click(emojiButton)
+
+    await user.click(screen.getByText('😀'))
+    await user.click(screen.getByText('❤️'))
+
+    const stored = JSON.parse(localStorage.getItem('recent-emojis') || '[]')
+    expect(stored).toEqual(['❤️', '😀'])
   })
 })
