@@ -13,6 +13,7 @@ dependencies = [
     "pydantic[email]>=2.13.2",
     "boto3>=1.35.0",
     "python-multipart>=0.0.9",
+    "alembic>=1.13.0",
 ]
 
 [project.optional-dependencies]

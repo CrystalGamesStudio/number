@@ -30,8 +30,8 @@ export interface ChatWidgetProps {
   position?: 'bottom-right' | 'bottom-left'
 }
 
-function themeToCssVars(theme: ThemeObject): React.CSSProperties {
-  const style: React.CSSProperties = {}
+function themeToCssVars(theme: ThemeObject): Record<string, string> {
+  const style: Record<string, string> = {}
   for (const [key, value] of Object.entries(theme)) {
     if (value !== undefined) {
       style[`--nw-${key}`] = value

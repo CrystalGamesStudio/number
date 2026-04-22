@@ -1,5 +1,5 @@
 import React from 'react'
-import { createRoot, type Root } from 'react-dom/client'
+import { createRoot } from 'react-dom/client'
 import { NumberChat, type ChatWidgetProps } from './widget'
 import './widget.css'
 

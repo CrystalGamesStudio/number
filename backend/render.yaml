@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: crystal-number-backend
+    env: python
+    buildCommand: pip install uv && uv sync --dev
+    startCommand: bash start.sh
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.14
