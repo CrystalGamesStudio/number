@@ -11,6 +11,11 @@ jobs:
     defaults:
       run:
         working-directory: ./backend
+    env:
+      NEON_HOST: ${{ secrets.NEON_HOST }}
+      NEON_DATABASE: ${{ secrets.NEON_DATABASE }}
+      NEON_USER: ${{ secrets.NEON_USER }}
+      NEON_PASSWORD: ${{ secrets.NEON_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
